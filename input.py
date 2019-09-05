@@ -4,7 +4,7 @@ from PIL import ImageGrab
 import cv2
 import numpy as np
 from direct_keys import PressKey, ReleaseKey, W, A, S, D, left_mouse, right_mouse
-import math
+from math import sqrt, pow
 
 
 class Box:
@@ -34,7 +34,7 @@ class Env:
             # print('stop turning')
 
     def done(self, image):
-        if image[70, 270] == 0:
+        if image[66, 274] == 0:
             return True
         return False
 
@@ -71,17 +71,19 @@ class Env:
 
     def get_reward(self, row, col):
         reward = 0
-        reward += math.pow(time.time() - self.ep_start, 1/10)
+        reward += pow(time.time() - self.ep_start, 1/10)
         if row < 200:
-            reward += 0.1 * (row - 110)
+            if row < 85:
+                reward += row - 85
+            reward += 0.5
         if row > 410:
-            reward += 0.1 * (500 - row)
+            if row > 525:
+                reward += 515 - row
+            reward += 0.5
         if 230 < row < 390 and col < 120:
             reward -= 0.1 * abs(col - 50)
-            reward += 1
         if 230 < row < 390 and col > 200:
             reward -= 0.1 * abs(col - 165)
-            reward += 1
         if not self.mouse_up:
             if row < 200 or row > 410:
                 reward += 0.5
@@ -90,19 +92,23 @@ class Env:
         return reward
 
     def reset(self):
+        print('reset')
         self.turn(0)
         screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
         screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
-        while not self.done(screen):
+        cnt = 0
+        while not self.done(screen) and cnt < 10:
             time.sleep(0.1)
             screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
             screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
+            cnt += 1
         pyautogui.click(800, 400)
         time.sleep(0.1)
         row, col, is_nan = self.process_img(screen)
         state = [row, col, float(self.mouse_up)]
         self.ep_start = time.time()
         self.time_checked = self.ep_start
+        print('exit_reset')
         return state
 
     def step(self, action, act=True):
@@ -119,7 +125,7 @@ class Env:
             reward = self.get_reward(car_row, car_col)
         else:
             state = [430.0, 62.0, True]
-            reward = -300
+            reward = -100
         info = 0
         if is_nan:
             if act:
@@ -129,7 +135,7 @@ class Env:
                 time.sleep(0.2)
                 done = True
                 state = [164.0, 237.0, False]
-                reward = -300
+                reward = -100
         return state, reward, done, info
 
 '''
