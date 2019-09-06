@@ -20,12 +20,14 @@ class Env:
     mouse_up = True
     ep_start = 0
     time_checked = 0
+    have_turned = False
 
     def turn(self, action):
         if self.mouse_up and action >= 0.5:
             # PressKey(0x100)
             PressKey(W)
             self.mouse_up = False
+            self.have_turned = True
             # print('turning')
         if not self.mouse_up and action < 0.5:
             # ReleaseKey(left_mouse)
@@ -69,9 +71,11 @@ class Env:
                 break
             last_time = time.time()
 
-    def get_reward(self, row, col):
+    def get_reward(self, row, col, done=False):
         reward = 0
-        reward += pow(time.time() - self.ep_start, 1/10)
+        ep_time = time.time() - self.ep_start
+        reward += pow(ep_time, 1/10)
+        '''
         if row < 200:
             if row < 85:
                 reward += row - 85
@@ -80,15 +84,22 @@ class Env:
             if row > 525:
                 reward += 515 - row
             reward += 0.5
+        '''
         if 230 < row < 390 and col < 120:
             reward -= 0.1 * abs(col - 50)
         if 230 < row < 390 and col > 200:
             reward -= 0.1 * abs(col - 165)
         if not self.mouse_up:
             if row < 200 or row > 410:
-                reward += 0.5
+                reward += 1
             if 230 < row < 390:
-                reward -= 0.3
+                reward -= 0.5
+        if done:
+            reward = -100
+            if not self.have_turned and ep_time > 2:
+                reward -= 50
+            if ep_time < 2:
+                reward -= 50
         return reward
 
     def reset(self):
@@ -108,6 +119,7 @@ class Env:
         state = [row, col, float(self.mouse_up)]
         self.ep_start = time.time()
         self.time_checked = self.ep_start
+        self.have_turned = False
         print('exit_reset')
         return state
 
@@ -124,9 +136,10 @@ class Env:
             state = [car_row, car_col, float(self.mouse_up)]
             reward = self.get_reward(car_row, car_col)
         else:
-            state = [430.0, 62.0, True]
-            reward = -100
-        info = 0
+            state = [430.0, 62.0, False]
+            reward = self.get_reward(430, 62, done=True)
+        info = dict()
+        info['time'] = time.time() - self.ep_start
         if is_nan:
             if act:
                 time.sleep(0.1)
@@ -134,16 +147,16 @@ class Env:
             else:
                 time.sleep(0.2)
                 done = True
-                state = [164.0, 237.0, False]
-                reward = -100
+                state = [430.0, 62.0, False]
+                reward = self.get_reward(430.0, 62.0, done=True)
         return state, reward, done, info
 
-'''
-env = Env()
-time.sleep(3)
-pyautogui.click(800, 400)
-time.sleep(0.5)
-env.turn(0.5)
-time.sleep(1.5)
-env.turn(0.01)
-'''
+
+if __name__ == '__main__':
+    env = Env()
+    time.sleep(3)
+    pyautogui.click(800, 400)
+    time.sleep(0.5)
+    env.turn(0.5)
+    time.sleep(1.5)
+    env.turn(0.01)

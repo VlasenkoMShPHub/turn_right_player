@@ -13,12 +13,12 @@ import torch.nn.functional as F
 from input import Env
 
 
-GAMMA = 0.1
+GAMMA = 0.5
 TAU = 0.05
 BATCH_SIZE = 1024
 ACTOR_LR = 1e-5
 CRITIC_LR = 1e-5
-MAX_EPISODES = 100
+MAX_EPISODES = 1000
 MAX_TIMESTAMPS = 100000
 SIGMA = 0.1
 EPS_MIN = 0.1  # from [0...1]
@@ -165,18 +165,16 @@ def exploit_episode(env, actor_tgt, actor, render=False):
     state = env.reset()
     done = 0
     ep_reward = 0
-    """
-    YOUR CODE GOES HERE
-    """
+    info = dict()
     while not done:
         if render:
             env.render()
         action = actor.make_action(state)
         np.clip(action, env.action_space.low[0], env.action_space.high[0])
-        state, reward, done, _ = env.step(action)
+        state, reward, done, info = env.step(action)
         print('exploit: {}\t{}\t{}\t{}'.format(action, state, reward, done))
         ep_reward += reward
-    print(f'ep_reward = {ep_reward}')
+    print(f'ep_reward = {ep_reward}, time = {info["time"]}')
     print()
     return ep_reward
 
@@ -189,15 +187,12 @@ def play_episode(noise, actor, critic, replay_buffer, env):
     state = env.reset()
     noise.eps_step()
     ep_reward = 0
-
-    """
-    YOUR CODE GOES HERE
-    """
+    info = dict()
     for i in range(MAX_TIMESTAMPS):
         action = actor.make_action(state)
         action = noise(action)
         np.clip(action, env.action_space.low[0], env.action_space.high[0])
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, done, info = env.step(action)
         print('play ep: {}\t{}\t{}\t{}'.format(action, state, reward, done))
         replay_buffer.append((state, action, reward, next_state, done))
         ep_reward += reward
@@ -207,7 +202,7 @@ def play_episode(noise, actor, critic, replay_buffer, env):
 
         if done:
             break
-    print(f'ep_reward = {ep_reward}')
+    print(f'ep_reward = {ep_reward}, time = {info["time"]}')
     print()
     return ep_reward, noise, actor, critic, replay_buffer
 
