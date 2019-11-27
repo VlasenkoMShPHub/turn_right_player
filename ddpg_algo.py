@@ -20,7 +20,7 @@ ACTOR_LR = 1e-5
 CRITIC_LR = 1e-5
 MAX_EPISODES = 1000
 MAX_TIMESTAMPS = 100000
-SIGMA = 0.1
+SIGMA = 0.3  # looks like random action coefficient
 EPS_MIN = 0.1  # from [0...1]
 ALGORITHM = 'DDPG'
 
@@ -131,9 +131,6 @@ def ddpg_update(actor, critic, replay_buffer):
     state, action, reward, next_state, done = \
         [to_torch(e) for e in zip(*random.sample(replay_buffer, BATCH_SIZE))]
 
-    """
-    YOUR CODE GOES HERE
-    """
     # get qvalue + target qvalue
     expected_qvalue = critic.target(next_state, actor.target(next_state))
     expected_qvalue = reward.unsqueeze(1) + (1.0 - done.unsqueeze(1)) * GAMMA * expected_qvalue
@@ -150,6 +147,7 @@ def ddpg_update(actor, critic, replay_buffer):
     actor_loss = - critic(state, actor(state)).mean()
     actor.optimizer.zero_grad()
     actor_loss.backward()
+    torch.nn.utils.clip_grad_norm_(actor.parameters(), 0.2)
     actor.optimizer.step()
 
     # update target networks
@@ -191,7 +189,7 @@ def play_episode(noise, actor, critic, replay_buffer, env):
     for i in range(MAX_TIMESTAMPS):
         action = actor.make_action(state)
         action = noise(action)
-        np.clip(action, env.action_space.low[0], env.action_space.high[0])
+        action = np.clip(action, env.action_space.low[0], env.action_space.high[0])
         next_state, reward, done, info = env.step(action)
         print('play ep: {}\t{}\t{}\t{}'.format(action, state, reward, done))
         replay_buffer.append((state, action, reward, next_state, done))
@@ -202,6 +200,7 @@ def play_episode(noise, actor, critic, replay_buffer, env):
 
         if done:
             break
+    print()
     print(f'ep_reward = {ep_reward}, time = {info["time"]}')
     print()
     return ep_reward, noise, actor, critic, replay_buffer

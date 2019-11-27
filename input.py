@@ -16,20 +16,20 @@ class Box:
 
 class Env:
     observation_space = Box([3], [0, 0, 0], [600, 400, 1])  # coords, mouse_up
-    action_space = Box([1], [0], [1])
+    action_space = Box([1], [-1], [1])
     mouse_up = True
     ep_start = 0
     time_checked = 0
     have_turned = False
 
     def turn(self, action):
-        if self.mouse_up and action >= 0.5:
+        if self.mouse_up and action >= 0:
             # PressKey(0x100)
             PressKey(W)
             self.mouse_up = False
             self.have_turned = True
             # print('turning')
-        if not self.mouse_up and action < 0.5:
+        if not self.mouse_up and action < 0:
             # ReleaseKey(left_mouse)
             ReleaseKey(W)
             self.mouse_up = True
@@ -74,7 +74,8 @@ class Env:
     def get_reward(self, row, col, done=False):
         reward = 0
         ep_time = time.time() - self.ep_start
-        reward += pow(ep_time, 1/10)
+        # reward += pow(ep_time, 1/10)
+        reward += 2
         '''
         if row < 200:
             if row < 85:
@@ -84,20 +85,22 @@ class Env:
             if row > 525:
                 reward += 515 - row
             reward += 0.5
-        '''
+        
         if 230 < row < 390 and col < 120:
             reward -= 0.1 * abs(col - 50)
         if 230 < row < 390 and col > 200:
             reward -= 0.1 * abs(col - 165)
+        '''
         if not self.mouse_up:
             if row < 200 or row > 410:
                 reward += 1
             if 230 < row < 390:
                 reward -= 0.5
+
         if done:
             reward = -100
-            if not self.have_turned and ep_time > 2:
-                reward -= 50
+            if not self.have_turned:
+                reward -= 100
             if ep_time < 2:
                 reward -= 50
         return reward
@@ -108,13 +111,17 @@ class Env:
         screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
         screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
         cnt = 0
-        while not self.done(screen) and cnt < 10:
+        time.sleep(0.5)
+        while not self.done(screen) and cnt < 100:
             time.sleep(0.1)
             screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
             screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
             cnt += 1
-        pyautogui.click(800, 400)
-        time.sleep(0.1)
+        # pyautogui.click(800, 400)
+        PressKey(W)
+        time.sleep(0.2)
+        ReleaseKey(W)
+        time.sleep(0.3)
         row, col, is_nan = self.process_img(screen)
         state = [row, col, float(self.mouse_up)]
         self.ep_start = time.time()
