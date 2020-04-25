@@ -1,2 +1,2 @@
 # turn_right_player
-DDPG algorithm plays "turn right"
+Trying to get computer playing "turn right" better than a human
