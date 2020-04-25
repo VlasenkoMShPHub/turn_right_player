@@ -15,21 +15,22 @@ class Box:
 
 
 class Env:
-    observation_space = Box([3], [0, 0, 0], [600, 400, 1])  # coords, mouse_up
-    action_space = Box([1], [-1], [1])
+    observation_space = Box([5], [0, 0, 0, 0, 0], [600, 400, 600, 400, 1])  # coords, mouse_up
+    action_space = Box([1], [0], [1])
     mouse_up = True
     ep_start = 0
     time_checked = 0
     have_turned = False
+    prev_state = []
 
     def turn(self, action):
-        if self.mouse_up and action >= 0:
+        if self.mouse_up and action >= 0.5:
             # PressKey(0x100)
             PressKey(W)
             self.mouse_up = False
             self.have_turned = True
             # print('turning')
-        if not self.mouse_up and action < 0:
+        if not self.mouse_up and action < 0.5:
             # ReleaseKey(left_mouse)
             ReleaseKey(W)
             self.mouse_up = True
@@ -47,9 +48,11 @@ class Env:
         # print(f'cols = {cols}, {len(cols)}')
         if rows.size == 0 or cols.size == 0:
             flag = True
+        if flag:
+            return 374, 54, flag
         row = np.mean(rows)
         col = np.mean(cols)
-        return round(row), round(col), flag
+        return int(row), int(col), flag
 
     def screen_record(self):
         last_time = time.time()
@@ -75,7 +78,7 @@ class Env:
         reward = 0
         ep_time = time.time() - self.ep_start
         # reward += pow(ep_time, 1/10)
-        reward += 2
+        # reward += 2
         '''
         if row < 200:
             if row < 85:
@@ -93,9 +96,9 @@ class Env:
         '''
         if not self.mouse_up:
             if row < 200 or row > 410:
-                reward += 1
+                reward += 10
             if 230 < row < 390:
-                reward -= 0.5
+                reward -= 5
 
         if done:
             reward = -100
@@ -107,7 +110,7 @@ class Env:
 
     def reset(self):
         print('reset')
-        self.turn(0)
+        self.turn(-1)
         screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
         screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
         cnt = 0
@@ -121,12 +124,13 @@ class Env:
         PressKey(W)
         time.sleep(0.2)
         ReleaseKey(W)
-        time.sleep(0.3)
+        time.sleep(1)
         row, col, is_nan = self.process_img(screen)
-        state = [row, col, float(self.mouse_up)]
+        state = [row, col, row, col, int(self.mouse_up)]
         self.ep_start = time.time()
         self.time_checked = self.ep_start
         self.have_turned = False
+        self.prev_state = [row, col]
         print('exit_reset')
         return state
 
@@ -140,10 +144,11 @@ class Env:
         if not done:
             car_row, car_col, is_nan = self.process_img(screen)
             # print(f'car on {car_row} {car_col}')
-            state = [car_row, car_col, float(self.mouse_up)]
+            state = [self.prev_state[0], self.prev_state[1], car_row, car_col, int(self.mouse_up)]
             reward = self.get_reward(car_row, car_col)
+            self.prev_state = [car_row, car_col]
         else:
-            state = [430.0, 62.0, False]
+            state = [430, 62, 430, 62, 0]
             reward = self.get_reward(430, 62, done=True)
         info = dict()
         info['time'] = time.time() - self.ep_start
@@ -154,7 +159,7 @@ class Env:
             else:
                 time.sleep(0.2)
                 done = True
-                state = [430.0, 62.0, False]
+                state = [430, 62, 430, 62, 0]
                 reward = self.get_reward(430.0, 62.0, done=True)
         return state, reward, done, info
 

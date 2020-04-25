@@ -62,7 +62,7 @@ class OUNoise:
         self.action_dim = action_space.shape[0]
         self.low = action_space.low[0]
         self.high = action_space.high[0]
-        self.eps_max = 1.0
+        self.eps_max = 0.5
         self.eps_min = EPS_MIN
         self.eps = self.eps_max
         self.eps_decay = (self.eps_max - self.eps_min) / MAX_EPISODES
@@ -92,7 +92,7 @@ class DDPGActor(nn.Module):
             nn.LayerNorm(300),
             nn.ReLU(),
             nn.Linear(300, act_size),
-            nn.Tanh(),
+            nn.Sigmoid(),
         )
 
     def forward(self, x):
@@ -220,8 +220,8 @@ def load(actor_tgt, weights_name):
 
 def get_tools():
     env = Env()
-    print(f"observation space: {env.observation_space}\n"
-          f"action space: {env.action_space}\n"
+    print(f"observation space: {env.observation_space.shape[0]}\n"
+          f"action space: {env.action_space.shape[0]}\n"
           f"action range: ({env.action_space.low[0]}, {env.action_space.high[0]})\n")
 
     # define noise

@@ -38,7 +38,7 @@ class EpsilonGreedyAgent(Agent):
         self._steps = min(self._decay_steps, self._steps + 1)
         epsilon = self._epsilon_max + (self._epsilon_min - self._epsilon_max) * self._steps / self._decay_steps
         if epsilon > np.random.random():
-            return np.random.randint(0, 3)
+            return np.random.random(1) * 2 - 1
         else:
             return self._inner_agent.act(state)
 
@@ -113,7 +113,8 @@ class DQN(Agent):
             nn.Linear(256, 256),
             nn.LayerNorm(256),
             nn.ReLU(),
-            nn.Linear(256, env.action_space.shape[0])
+            nn.Linear(256, env.action_space.shape[0]),
+            nn.Tanh(),
         )
 
         self._target_model = copy.deepcopy(self._model)
@@ -138,8 +139,10 @@ class DQN(Agent):
 
     def act(self, state):
         state = torch.tensor(state).to(self._device).float()
-        print(self._target_model(state))
-        return self._target_model(state).max(0)[1].item()
+        # print(self._target_model(state))
+        action = self._target_model(state).detach().cpu().numpy()
+        print(action)
+        return action
 
     def update(self, batch):
         prev_states, actions, states, rewards, dones = batch
@@ -289,7 +292,7 @@ updater = PriorityDQNUpdater(dqn_with_per_agent, buffer_size=65536)  # Для к
 epsilon_greedy = EpsilonGreedyAgent(dqn_with_per_agent, decay_steps=max_steps)
 start_time = time.time()
 rewards, steps = train_agent(env, epsilon_greedy, dqn_with_per_agent, updater, env_steps=max_steps,
-                             exploit_every=max_steps // 200)
-print("Training time:", time.time() - start_time)
+                             exploit_every=10)
+# print("Training time:", time.time() - start_time)
 
 # plot_rewards(rewards, steps)
