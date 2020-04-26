@@ -4,7 +4,7 @@ from PIL import ImageGrab
 import cv2
 import numpy as np
 from direct_keys import PressKey, ReleaseKey, W, A, S, D, left_mouse, right_mouse
-from math import sqrt, pow
+from math import sqrt, pow, atan
 
 
 class Box:
@@ -29,12 +29,10 @@ class Env:
             PressKey(W)
             self.mouse_up = False
             self.have_turned = True
-            # print('turning')
         if not self.mouse_up and action < 0.5:
             # ReleaseKey(left_mouse)
             ReleaseKey(W)
             self.mouse_up = True
-            # print('stop turning')
 
     def done(self, image):
         if image[66, 274] == 0:
@@ -74,6 +72,14 @@ class Env:
                 break
             last_time = time.time()
 
+    def get_direction(self, x, y):
+        if x == 0:
+            return 0
+        t = round(atan(y / x) + 2, 1)
+        if x < 0:
+            return int(round(t + 4, 1) * 10)
+        return int(t * 10)
+
     def get_reward(self, row, col, done=False):
         reward = 0
         ep_time = time.time() - self.ep_start
@@ -95,16 +101,25 @@ class Env:
             reward -= 0.1 * abs(col - 165)
         '''
         if not self.mouse_up:
-            if row < 200 or row > 410:
-                reward += 10
-            if 230 < row < 390:
+            if row < 210 or row > 430:
+                reward += 20
+                if row < 140 or row > 500:
+                    reward += 30
+            if 250 < row < 350:
                 reward -= 5
+        else:
+            if row < 140 or row > 500:
+                reward -= 30
+
+        #if self.mouse_up:
+            #if 250 < row < 360:
+                #reward += 1
 
         if done:
             reward = -100
             if not self.have_turned:
                 reward -= 100
-            if ep_time < 2:
+            if ep_time < 1:
                 reward -= 50
         return reward
 
@@ -126,7 +141,7 @@ class Env:
         ReleaseKey(W)
         time.sleep(1)
         row, col, is_nan = self.process_img(screen)
-        state = [row, col, row, col, int(self.mouse_up)]
+        state = [row, col, 0, int(self.mouse_up)]
         self.ep_start = time.time()
         self.time_checked = self.ep_start
         self.have_turned = False
@@ -143,32 +158,18 @@ class Env:
         done = self.done(screen)
         if not done:
             car_row, car_col, is_nan = self.process_img(screen)
-            # print(f'car on {car_row} {car_col}')
-            state = [self.prev_state[0], self.prev_state[1], car_row, car_col, int(self.mouse_up)]
+            state = [car_row, car_col, self.get_direction(
+                car_row - self.prev_state[0], car_col - self.prev_state[1]), int(self.mouse_up)]
             reward = self.get_reward(car_row, car_col)
             self.prev_state = [car_row, car_col]
         else:
-            state = [430, 62, 430, 62, 0]
-            reward = self.get_reward(430, 62, done=True)
+            state = [430, 62, 0, 0]
+            reward = self.get_reward(0, 0, done=True)
         info = dict()
         info['time'] = time.time() - self.ep_start
         if is_nan:
-            if act:
-                time.sleep(0.1)
-                state, reward, done, info = self.step(action, False)
-            else:
-                time.sleep(0.2)
-                done = True
-                state = [430, 62, 430, 62, 0]
-                reward = self.get_reward(430.0, 62.0, done=True)
+            time.sleep(0.3)
+            done = True
+            state = [430, 62, 0, 0]
+            reward = self.get_reward(0, 0, done=True)
         return state, reward, done, info
-
-
-if __name__ == '__main__':
-    env = Env()
-    time.sleep(3)
-    pyautogui.click(800, 400)
-    time.sleep(0.5)
-    env.turn(0.5)
-    time.sleep(1.5)
-    env.turn(0.01)
