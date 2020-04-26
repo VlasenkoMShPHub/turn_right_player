@@ -81,7 +81,7 @@ class Env:
         return int(t * 10)
 
     def get_reward(self, row, col, done=False):
-        reward = 0
+        reward = 5
         ep_time = time.time() - self.ep_start
         # reward += pow(ep_time, 1/10)
         # reward += 2
@@ -102,14 +102,14 @@ class Env:
         '''
         if not self.mouse_up:
             if row < 210 or row > 430:
-                reward += 20
+                reward += 10
                 if row < 140 or row > 500:
-                    reward += 30
+                    reward += 20
             if 250 < row < 350:
                 reward -= 5
         else:
             if row < 140 or row > 500:
-                reward -= 30
+                reward -= 15
 
         #if self.mouse_up:
             #if 250 < row < 360:

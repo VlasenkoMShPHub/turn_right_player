@@ -4,7 +4,7 @@ import pyautogui
 import time
 from q_learning import train_agent, QLearning, QLearningUpdater, EpsilonGreedyAgent
 
-load_table_name = 'q_l_tables/.npy'
+load_table_name = 'q_l_tables/Q_learning_65_4126_900.npy'
 
 
 def main():

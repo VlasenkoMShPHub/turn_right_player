@@ -19,7 +19,7 @@ class Agent:
 class EpsilonGreedyAgent(Agent):
     '''Эпсилон-жадный алгоритм. С вероятностью эпсилон совершает случайное действие, иначе - действие, которое хочет совершить другой агент'''
 
-    def __init__(self, inner_agent, epsilon_max=0.2, epsilon_min=0.05, decay_steps=1000):
+    def __init__(self, inner_agent, epsilon_max=0.5, epsilon_min=0.1, decay_steps=1000):
         self._inner_agent = inner_agent
         self._decay_steps = decay_steps
         self._steps = 0
@@ -40,7 +40,7 @@ class EpsilonGreedyAgent(Agent):
 
 
 class QLearning(Agent):
-    def __init__(self, actions=2, alpha=0.2, gamma=0.8):
+    def __init__(self, actions=2, alpha=0.1, gamma=0.9):
         self._table = np.zeros((600//discrete_factor, 600//discrete_factor, 100//discrete_factor, 2, actions), dtype=np.single)
         self._alpha = alpha
         self._gamma = gamma
@@ -57,7 +57,7 @@ class QLearning(Agent):
         # print(target_q, predicted_q)
         self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action] =\
             (1 - self._alpha) * predicted_q + self._alpha * target_q
-        print('result = ', self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action])
+        print('result = ', self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]])
 
     def act(self, state, step):
         if np.sum(self._table[state[0]][state[1]][state[2]][state[3]] == 0) == 2:
@@ -97,14 +97,21 @@ def play_episode(env, agent: Agent, step):
     done = False
     trajectory = []
     total_reward = 0
+    final_rwd = 0
     while not done:
         action = agent.act(state, step)
         new_state, reward, done, info = env.step(action)
         new_state = [new_state[0]//discrete_factor, new_state[1]//discrete_factor, new_state[2]//discrete_factor, new_state[3]]
         total_reward += reward
-        trajectory.append((state, action, new_state, reward, done))
+        trajectory.append([state, action, new_state, reward, done])
         print('play ep: {}\t{}\t{}\t{}'.format(action, state, reward, done))
         state = new_state.copy()
+        final_rwd = reward
+
+    for i in range(len(trajectory)-1, max(0, len(trajectory) - 20), -1):
+        final_rwd = final_rwd * 0.7
+        trajectory[i][3] += final_rwd
+
     return trajectory, total_reward
 
 
