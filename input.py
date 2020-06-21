@@ -24,6 +24,9 @@ class Env:
     have_turned = False
     prev_state = []
 
+    def __init__(self, algo):
+        self.new_algo = algo
+
     def turn(self, action):
         if self.mouse_up and action >= 0.5:
             # PressKey(0x100)
@@ -68,26 +71,34 @@ class Env:
             return int(round(t + 4, 1) * 10)
         return int(t * 10)
 
+    def passed(self, var1, var2, border):
+        if var1 < border <= var2:
+            print(f'gate passed {var1} {var2} {border}')
+            return 101
+        if var1 > border >= var2:
+            print(f'gate passed {border}')
+            return 101
+        return 0
+
+    def get_reward2(self, row, col, dir, done=False):
+        if done:
+            reward = -100
+            if not self.have_turned:
+                reward -= 100
+            return reward
+        reward = -1
+        reward += self.passed(self.prev_state[0], row, 180)
+        reward += self.passed(self.prev_state[0], row, 300)
+        reward += self.passed(self.prev_state[0], row, 420)
+        reward += self.passed(self.prev_state[1], col, 155)
+        return reward
+
     def get_reward(self, row, col, dir, done=False):
+        if self.new_algo:
+            return self.get_reward2(row, col, dir, done)
+
         reward = 3
         ep_time = time.time() - self.ep_start
-        # reward += pow(ep_time, 1/10)
-        # reward += 2
-        '''
-        if row < 200:
-            if row < 85:
-                reward += row - 85
-            reward += 0.5
-        if row > 410:
-            if row > 525:
-                reward += 515 - row
-            reward += 0.5
-        
-        if 230 < row < 390 and col < 120:
-            reward -= 0.1 * abs(col - 50)
-        if 230 < row < 390 and col > 200:
-            reward -= 0.1 * abs(col - 165)
-        '''
         if not self.mouse_up:
             if row < 210 or row > 430:
                 reward += 10
@@ -98,12 +109,6 @@ class Env:
                 reward -= 15
             if 230 < row < 400 and 17 <= dir <= 23:
                 reward += 10
-
-        # add reward for going straight
-
-        #if self.mouse_up:
-            #if 250 < row < 360:
-                #reward += 1
 
         if done:
             reward = -100
@@ -141,10 +146,11 @@ class Env:
         done = self.done(screen)
         if not done:
             car_row, car_col, is_nan = self.process_img(screen)
-            state = [car_row, car_col, self.get_direction(
-                car_row - self.prev_state[0], car_col - self.prev_state[1]), int(self.mouse_up)]
-            reward = self.get_reward(car_row, car_col, state[2])
-            self.prev_state = [car_row, car_col]
+            if not is_nan:
+                state = [car_row, car_col, self.get_direction(
+                    car_row - self.prev_state[0], car_col - self.prev_state[1]), int(self.mouse_up)]
+                reward = self.get_reward(car_row, car_col, state[2])
+                self.prev_state = [car_row, car_col]
         else:
             state = [430, 62, 0, 0]
             reward = self.get_reward(0, 0, 20, done=True)
