@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 from direct_keys import PressKey, ReleaseKey, W, A, S, D, left_mouse, right_mouse
 from math import sqrt, pow, atan
+from mss import mss
 
 
 class Box:
@@ -39,6 +40,13 @@ class Env:
             return True
         return False
 
+    def get_screen(self):
+        with mss() as sct:
+            monitor = {"left": 400, "top": 50, "width": 400, "height": 600}
+            screen = sct.grab(monitor)
+            screen = cv2.cvtColor(np.array(screen), cv2.COLOR_RGB2GRAY)
+        return screen
+
     def process_img(self, image):
         flag = False
         rows, cols = np.where(image == 0)
@@ -52,26 +60,6 @@ class Env:
         col = np.mean(cols)
         return int(row), int(col), flag
 
-    def screen_record(self):
-        last_time = time.time()
-        while True:
-            screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
-            screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
-            if self.done(screen):
-                print('done')
-                break
-            car_row, car_col, is_nan = self.process_img(screen)
-            print(f'car on {car_row} {car_col}')
-            # screen2 = cv2.Canny(screen, threshold1=200, threshold2=300)
-            # process_img(screen)
-
-            print('loop took {} seconds'.format(time.time()-last_time))
-            cv2.imshow('window', screen)
-            if cv2.waitKey(25) & 0xFF == ord('q'):
-                cv2.destroyAllWindows()
-                break
-            last_time = time.time()
-
     def get_direction(self, x, y):
         if x == 0:
             return 0
@@ -80,8 +68,8 @@ class Env:
             return int(round(t + 4, 1) * 10)
         return int(t * 10)
 
-    def get_reward(self, row, col, done=False):
-        reward = 5
+    def get_reward(self, row, col, dir, done=False):
+        reward = 3
         ep_time = time.time() - self.ep_start
         # reward += pow(ep_time, 1/10)
         # reward += 2
@@ -105,11 +93,13 @@ class Env:
                 reward += 10
                 if row < 140 or row > 500:
                     reward += 20
-            if 250 < row < 350:
-                reward -= 5
         else:
             if row < 140 or row > 500:
                 reward -= 15
+            if 230 < row < 400 and 17 <= dir <= 23:
+                reward += 10
+
+        # add reward for going straight
 
         #if self.mouse_up:
             #if 250 < row < 360:
@@ -126,15 +116,9 @@ class Env:
     def reset(self):
         print('reset')
         self.turn(-1)
-        screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
-        screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
+        screen = self.get_screen()
         cnt = 0
-        time.sleep(0.5)
-        while not self.done(screen) and cnt < 100:
-            time.sleep(0.1)
-            screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
-            screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
-            cnt += 1
+        time.sleep(2)
         # pyautogui.click(800, 400)
         PressKey(W)
         time.sleep(0.2)
@@ -153,23 +137,22 @@ class Env:
         is_nan = False
         if act:
             self.turn(float(action))
-        screen = np.array(ImageGrab.grab(bbox=(400, 50, 800, 650)))
-        screen = cv2.cvtColor(screen, cv2.COLOR_RGB2GRAY)
+        screen = self.get_screen()
         done = self.done(screen)
         if not done:
             car_row, car_col, is_nan = self.process_img(screen)
             state = [car_row, car_col, self.get_direction(
                 car_row - self.prev_state[0], car_col - self.prev_state[1]), int(self.mouse_up)]
-            reward = self.get_reward(car_row, car_col)
+            reward = self.get_reward(car_row, car_col, state[2])
             self.prev_state = [car_row, car_col]
         else:
             state = [430, 62, 0, 0]
-            reward = self.get_reward(0, 0, done=True)
+            reward = self.get_reward(0, 0, 20, done=True)
         info = dict()
         info['time'] = time.time() - self.ep_start
         if is_nan:
             time.sleep(0.3)
             done = True
             state = [430, 62, 0, 0]
-            reward = self.get_reward(0, 0, done=True)
+            reward = self.get_reward(0, 0, 20, done=True)
         return state, reward, done, info

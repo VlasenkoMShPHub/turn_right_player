@@ -5,7 +5,7 @@ import torch
 
 
 device = torch.device("cuda")
-discrete_factor = 5
+discrete_factor = 4
 
 
 class Agent:
@@ -19,7 +19,7 @@ class Agent:
 class EpsilonGreedyAgent(Agent):
     '''Эпсилон-жадный алгоритм. С вероятностью эпсилон совершает случайное действие, иначе - действие, которое хочет совершить другой агент'''
 
-    def __init__(self, inner_agent, epsilon_max=0.5, epsilon_min=0.1, decay_steps=1000):
+    def __init__(self, inner_agent, epsilon_max=0, epsilon_min=0, decay_steps=1000):
         self._inner_agent = inner_agent
         self._decay_steps = decay_steps
         self._steps = 0
@@ -29,9 +29,9 @@ class EpsilonGreedyAgent(Agent):
     def act(self, state, step):
         self._steps = step
         epsilon = self._epsilon_max + (self._epsilon_min - self._epsilon_max) * self._steps / self._decay_steps
-        if epsilon > np.random.random():
+        if np.random.random() < epsilon:
             print('random')
-            return np.random.randint(0, 2)
+            return np.random.randint(0, 2), [0, 0]
         else:
             return self._inner_agent.act(state, step)
 
@@ -57,12 +57,11 @@ class QLearning(Agent):
         # print(target_q, predicted_q)
         self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action] =\
             (1 - self._alpha) * predicted_q + self._alpha * target_q
-        print('result = ', self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]])
 
     def act(self, state, step):
         if np.sum(self._table[state[0]][state[1]][state[2]][state[3]] == 0) == 2:
             print('both zero')
-        return np.argmax(self._table[state[0]][state[1]][state[2]][state[3]])
+        return np.argmax(self._table[state[0]][state[1]][state[2]][state[3]]), self._table[state[0]][state[1]][state[2]][state[3]]
 
     def save_table(self, reward, step):
         print()
@@ -99,17 +98,17 @@ def play_episode(env, agent: Agent, step):
     total_reward = 0
     final_rwd = 0
     while not done:
-        action = agent.act(state, step)
+        action, table_values = agent.act(state, step)
         new_state, reward, done, info = env.step(action)
         new_state = [new_state[0]//discrete_factor, new_state[1]//discrete_factor, new_state[2]//discrete_factor, new_state[3]]
         total_reward += reward
         trajectory.append([state, action, new_state, reward, done])
-        print('play ep: {}\t{}\t{}\t{}'.format(action, state, reward, done))
+        print('play ep: {}\t{}\t{}\t{}\t{}'.format(action, state, reward, done, table_values))
         state = new_state.copy()
         final_rwd = reward
 
-    for i in range(len(trajectory)-1, max(0, len(trajectory) - 20), -1):
-        final_rwd = final_rwd * 0.7
+    for i in range(len(trajectory)-1, max(0, len(trajectory) - 60), -1):
+        final_rwd = final_rwd * 0.8
         trajectory[i][3] += final_rwd
 
     return trajectory, total_reward
