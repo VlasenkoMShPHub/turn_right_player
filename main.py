@@ -1,15 +1,14 @@
-from unity_input import Env
-from ddpg_algo import train_draft, get_tools
-import pyautogui
+from input import Env
 import time
-from new_q_learning import train_agent, QLearning, QLearningUpdater, EpsilonGreedyAgent
+from q_learning import train_agent, QLearning, QLearningUpdater, EpsilonGreedyAgent
+import numpy as np
+
 
 load_table_name = 'q_l_tables/Q_learning_-56_30409_114032.npy'
-new_algo = True
 
 
 def main():
-    env = Env(new_algo)
+    env = Env()
     q_learning_agent = QLearning()
     if len(load_table_name) > 20:
         print(f'loading table {load_table_name}')
@@ -18,6 +17,7 @@ def main():
     updater = QLearningUpdater(q_learning_agent)
     epsilon_greedy = EpsilonGreedyAgent(q_learning_agent)
     rewards = train_agent(env, epsilon_greedy, q_learning_agent, updater)
+    np.save('q_l_tables/rewards.npy', rewards)
 
 
 if __name__ == '__main__':

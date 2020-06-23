@@ -1,10 +1,8 @@
-import pyautogui
 import time
-from PIL import ImageGrab
 import cv2
 import numpy as np
-from direct_keys import PressKey, ReleaseKey, W, A, S, D, left_mouse, right_mouse
-from math import sqrt, pow, atan
+from direct_keys import PressKey, ReleaseKey, Q, W
+from math import atan
 from mss import mss
 
 
@@ -16,54 +14,43 @@ class Box:
 
 
 class Env:
-    observation_space = Box([5], [0, 0, 0, 0, 0], [600, 400, 600, 400, 1])  # coords, mouse_up
-    action_space = Box([1], [0], [1])
-    mouse_up = True
-    ep_start = 0
-    time_checked = 0
-    have_turned = False
-    prev_state = []
+    def __init__(self):
+        self.observation_space = Box([5], [0, 0, 0, 0, 0], [600, 400, 100, 1])  # coords, direction, mouse_up
+        self.action_space = Box([1], [0], [1])
+        self.mouse_up = True
+        self.ep_start = 0
+        self.time_checked = 0
+        self.have_turned = False
+        self.prev_state = []
 
-    def __init__(self, algo):
-        self.new_algo = algo
-
-    def turn(self, action):
-        if self.mouse_up and action >= 0.5:
-            # PressKey(0x100)
-            PressKey(W)
-            self.mouse_up = False
-            self.have_turned = True
-        if not self.mouse_up and action < 0.5:
-            # ReleaseKey(left_mouse)
-            ReleaseKey(W)
-            self.mouse_up = True
-
-    def done(self, image):
-        if image[66, 274] == 0:
+    @staticmethod
+    def done(image):
+        if image[330, 225] != 255:
             return True
         return False
 
-    def get_screen(self):
+    @staticmethod
+    def get_screen():
         with mss() as sct:
-            monitor = {"left": 400, "top": 50, "width": 400, "height": 600}
+            monitor = {"left": 0, "top": 30, "width": 400, "height": 600}
             screen = sct.grab(monitor)
             screen = cv2.cvtColor(np.array(screen), cv2.COLOR_RGB2GRAY)
         return screen
 
-    def process_img(self, image):
+    @staticmethod
+    def process_img(image):
         flag = False
         rows, cols = np.where(image == 0)
-        # print(f'rows = {rows}, {len(rows)}')
-        # print(f'cols = {cols}, {len(cols)}')
         if rows.size == 0 or cols.size == 0:
             flag = True
         if flag:
-            return 374, 54, flag
+            return 265, 97, flag
         row = np.mean(rows)
         col = np.mean(cols)
         return int(row), int(col), flag
 
-    def get_direction(self, x, y):
+    @staticmethod
+    def get_direction(x, y):
         if x == 0:
             return 0
         t = round(atan(y / x) + 2, 1)
@@ -71,64 +58,52 @@ class Env:
             return int(round(t + 4, 1) * 10)
         return int(t * 10)
 
-    def gate(self, var1, var2, border):
+    @staticmethod
+    def gate(var1, var2, border):
         if var1 < border <= var2:
-            print(f'gate gate {var1} {var2} {border}')
-            return 101
+            print(f'gate passed {var1} {var2} {border}')
+            return 51
         if var1 > border >= var2:
-            print(f'gate gate {border}')
-            return 101
+            print(f'gate passed {border}')
+            return 51
         return 0
 
-    def get_reward2(self, row, col, dir, done=False):
+    @classmethod
+    def check_car_pos(cls):
+        screen = cls.get_screen()
+        row, col, is_nan = cls.process_img(screen)
+        return row, col
+
+    def get_reward(self, row, col, direction, done=False):
         if done:
             reward = -100
             if not self.have_turned:
                 reward -= 100
             return reward
         reward = -1
-        reward += self.passed(self.prev_state[0], row, 180)
-        reward += self.passed(self.prev_state[0], row, 300)
-        reward += self.passed(self.prev_state[0], row, 420)
-        reward += self.passed(self.prev_state[1], col, 155)
+        reward += self.gate(self.prev_state[0], row, 145)
+        reward += self.gate(self.prev_state[0], row, 330)
+        reward += self.gate(self.prev_state[0], row, 515)
+        reward += self.gate(self.prev_state[1], col, 225)
         return reward
 
-    def get_reward(self, row, col, dir, done=False):
-        if self.new_algo:
-            return self.get_reward2(row, col, dir, done)
-
-        reward = 3
-        ep_time = time.time() - self.ep_start
-        if not self.mouse_up:
-            if row < 210 or row > 430:
-                reward += 10
-                if row < 140 or row > 500:
-                    reward += 20
-        else:
-            if row < 140 or row > 500:
-                reward -= 15
-            if 230 < row < 400 and 17 <= dir <= 23:
-                reward += 10
-
-        if done:
-            reward = -100
-            if not self.have_turned:
-                reward -= 100
-            if ep_time < 1:
-                reward -= 50
-        return reward
+    def turn(self, action):
+        if self.mouse_up and action >= 0.5:
+            PressKey(W)
+            self.mouse_up = False
+            self.have_turned = True
+        if not self.mouse_up and action < 0.5:
+            ReleaseKey(W)
+            self.mouse_up = True
 
     def reset(self):
         print('reset')
         self.turn(-1)
+        time.sleep(1.1)
+        PressKey(Q)
         screen = self.get_screen()
-        cnt = 0
-        time.sleep(2)
-        # pyautogui.click(800, 400)
-        PressKey(W)
-        time.sleep(0.2)
-        ReleaseKey(W)
-        time.sleep(1)
+        time.sleep(0.03)
+        ReleaseKey(Q)
         row, col, is_nan = self.process_img(screen)
         state = [row, col, 0, int(self.mouse_up)]
         self.ep_start = time.time()
@@ -139,26 +114,24 @@ class Env:
         return state
 
     def step(self, action, act=True):
-        is_nan = False
         if act:
             self.turn(float(action))
         screen = self.get_screen()
         done = self.done(screen)
         if not done:
             car_row, car_col, is_nan = self.process_img(screen)
-            if not is_nan:
+            if is_nan:
+                done = True
+                state = [269, 116, 0, 0]
+                reward = self.get_reward(0, 0, 0, done=True)
+            else:
                 state = [car_row, car_col, self.get_direction(
                     car_row - self.prev_state[0], car_col - self.prev_state[1]), int(self.mouse_up)]
                 reward = self.get_reward(car_row, car_col, state[2])
                 self.prev_state = [car_row, car_col]
         else:
-            state = [430, 62, 0, 0]
-            reward = self.get_reward(0, 0, 20, done=True)
+            state = [269, 116, 0, 0]
+            reward = self.get_reward(0, 0, 0, done=True)
         info = dict()
         info['time'] = time.time() - self.ep_start
-        if is_nan:
-            time.sleep(0.3)
-            done = True
-            state = [430, 62, 0, 0]
-            reward = self.get_reward(0, 0, 20, done=True)
         return state, reward, done, info
