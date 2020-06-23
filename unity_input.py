@@ -72,10 +72,10 @@ class Env:
     def gate(self, var1, var2, border):
         if var1 < border <= var2:
             print(f'gate passed {var1} {var2} {border}')
-            return 101
+            return 51
         if var1 > border >= var2:
             print(f'gate passed {border}')
-            return 101
+            return 51
         return 0
 
     def get_reward(self, row, col, dir, done=False):
@@ -85,20 +85,20 @@ class Env:
                 reward -= 100
             return reward
         reward = -1
-        reward += self.gate(self.prev_state[0], row, 170)
+        reward += self.gate(self.prev_state[0], row, 145)
         reward += self.gate(self.prev_state[0], row, 330)
-        reward += self.gate(self.prev_state[0], row, 490)
+        reward += self.gate(self.prev_state[0], row, 515)
         reward += self.gate(self.prev_state[1], col, 225)
         return reward
 
     def reset(self):
         print('reset')
         self.turn(-1)
-        screen = self.get_screen()
         cnt = 0
         time.sleep(1.1)
         PressKey(Q)
-        time.sleep(0.05)
+        screen = self.get_screen()
+        time.sleep(0.03)
         ReleaseKey(Q)
         row, col, is_nan = self.process_img(screen)
         state = [row, col, 0, int(self.mouse_up)]
@@ -123,7 +123,7 @@ class Env:
                 reward = self.get_reward(car_row, car_col, state[2])
                 self.prev_state = [car_row, car_col]
         else:
-            state = [265, 97, 0, 0]
+            state = [269, 116, 0, 0]
             reward = self.get_reward(0, 0, 20, done=True)
         info = dict()
         info['time'] = time.time() - self.ep_start
@@ -131,6 +131,11 @@ class Env:
             print('car not found')
             time.sleep(0.1)
             done = True
-            state = [265, 97, 0, 0]
+            state = [269, 116, 0, 0]
             reward = self.get_reward(0, 0, 20, done=True)
         return state, reward, done, info
+
+    def check_car_pos(self):
+        screen = self.get_screen()
+        row, col, is_nan = self.process_img(screen)
+        return row, col

@@ -5,7 +5,7 @@ import torch
 
 
 device = torch.device("cuda")
-discrete_factor = 4
+discrete_factor = 3
 
 
 class Agent:
@@ -32,36 +32,50 @@ class EpsilonGreedyAgent(Agent):
         else:
             return self._inner_agent.act(state)
 
+    def save_table(self, reward, step):
+        self._inner_agent.save_table()
+
 
 class QLearning(Agent):
-    def __init__(self, actions=2, alpha=0.1, gamma=0.99):
+    def __init__(self, actions=2, alpha=0.9, gamma=0.99):
         self._table = np.zeros((600 // discrete_factor, 600 // discrete_factor, 100 // discrete_factor, 2, actions),
-                               dtype=np.int)
+                               dtype=np.float32)
         self._alpha = alpha
         self._gamma = gamma
 
     def update(self, transition):
-        '''
-        Обновление таблицы по одному переходу
-        '''
+        '''Обновление таблицы по одному переходу'''
         prev_state, action, state, reward, done = transition
         target_q = reward
         if not done:
             target_q += self._gamma * np.max(self._table[state[0]][state[1]][state[2]][state[3]])
-        predicted_q = self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action]
-        self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action] = \
-            (1 - self._alpha) * predicted_q + self._alpha * target_q
+
+        self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action] +=\
+            self._alpha * (target_q - self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action])
+        # print(target_q, self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action])
 
     def act(self, state):
         if np.sum(self._table[state[0]][state[1]][state[2]][state[3]] == 0) == 2:
             print('both zero')
+        else:
+            print(self._table[state[0]][state[1]][state[2]][state[3]])
         return np.argmax(self._table[state[0]][state[1]][state[2]][state[3]])
+
+    def save_table(self, reward, step):
+        print()
+        print('saving')
+        non_zero = np.sum(self._table != 0)
+        print('{} non-zero values'.format(non_zero))
+        np.save('q_l_tables/Q_learning_{}_{}_{}.npy'.format(reward, non_zero, step), self._table)
+
+    def load_table(self, name):
+        self._table = np.load(name)
 
 
 class QLearningUpdater:
-    def __init__(self, qlearning: QLearning, backward=False):
+    def __init__(self, qlearning: QLearning):
         self._q_learning = qlearning
-        self._backward = backward
+        self._backward = True
 
     def update(self, trajectory):
         print(trajectory)
@@ -107,6 +121,7 @@ def train_agent(env, exploration_agent: Agent, exploitation_agent: Agent, update
             _, reward = play_episode(env, exploitation_agent)
             rewards.append(reward)
             steps.append(steps_count)
+            exploitation_agent.save_table(reward, steps_count)
         else:
             trajectory, reward = play_episode(env, exploration_agent)
             steps_count += len(trajectory)
