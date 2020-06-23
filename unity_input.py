@@ -1,9 +1,9 @@
 import pyautogui
 import time
-from PIL import ImageGrab
+from PIL import ImageGrab, Image
 import cv2
 import numpy as np
-from direct_keys import PressKey, ReleaseKey, W, A, S, D, left_mouse, right_mouse
+from direct_keys import PressKey, ReleaseKey, Q, W, A, S, D, left_mouse, right_mouse
 from math import sqrt, pow, atan
 from mss import mss
 
@@ -29,23 +29,21 @@ class Env:
 
     def turn(self, action):
         if self.mouse_up and action >= 0.5:
-            # PressKey(0x100)
             PressKey(W)
             self.mouse_up = False
             self.have_turned = True
         if not self.mouse_up and action < 0.5:
-            # ReleaseKey(left_mouse)
             ReleaseKey(W)
             self.mouse_up = True
 
     def done(self, image):
-        if image[66, 274] == 0:
+        if image[330, 225] != 255:
             return True
         return False
 
     def get_screen(self):
         with mss() as sct:
-            monitor = {"left": 400, "top": 50, "width": 400, "height": 600}
+            monitor = {"left": 0, "top": 30, "width": 400, "height": 600}
             screen = sct.grab(monitor)
             screen = cv2.cvtColor(np.array(screen), cv2.COLOR_RGB2GRAY)
         return screen
@@ -53,12 +51,12 @@ class Env:
     def process_img(self, image):
         flag = False
         rows, cols = np.where(image == 0)
-        # print(f'rows = {rows}, {len(rows)}')
-        # print(f'cols = {cols}, {len(cols)}')
+        # print(f'rows = {len(rows)}')
+        # print(f'cols = {len(cols)}')
         if rows.size == 0 or cols.size == 0:
             flag = True
         if flag:
-            return 374, 54, flag
+            return 265, 97, flag
         row = np.mean(rows)
         col = np.mean(cols)
         return int(row), int(col), flag
@@ -73,49 +71,24 @@ class Env:
 
     def gate(self, var1, var2, border):
         if var1 < border <= var2:
-            print(f'gate gate {var1} {var2} {border}')
+            print(f'gate passed {var1} {var2} {border}')
             return 101
         if var1 > border >= var2:
-            print(f'gate gate {border}')
+            print(f'gate passed {border}')
             return 101
         return 0
 
-    def get_reward2(self, row, col, dir, done=False):
+    def get_reward(self, row, col, dir, done=False):
         if done:
             reward = -100
             if not self.have_turned:
                 reward -= 100
             return reward
         reward = -1
-        reward += self.passed(self.prev_state[0], row, 180)
-        reward += self.passed(self.prev_state[0], row, 300)
-        reward += self.passed(self.prev_state[0], row, 420)
-        reward += self.passed(self.prev_state[1], col, 155)
-        return reward
-
-    def get_reward(self, row, col, dir, done=False):
-        if self.new_algo:
-            return self.get_reward2(row, col, dir, done)
-
-        reward = 3
-        ep_time = time.time() - self.ep_start
-        if not self.mouse_up:
-            if row < 210 or row > 430:
-                reward += 10
-                if row < 140 or row > 500:
-                    reward += 20
-        else:
-            if row < 140 or row > 500:
-                reward -= 15
-            if 230 < row < 400 and 17 <= dir <= 23:
-                reward += 10
-
-        if done:
-            reward = -100
-            if not self.have_turned:
-                reward -= 100
-            if ep_time < 1:
-                reward -= 50
+        reward += self.gate(self.prev_state[0], row, 170)
+        reward += self.gate(self.prev_state[0], row, 330)
+        reward += self.gate(self.prev_state[0], row, 490)
+        reward += self.gate(self.prev_state[1], col, 225)
         return reward
 
     def reset(self):
@@ -123,12 +96,10 @@ class Env:
         self.turn(-1)
         screen = self.get_screen()
         cnt = 0
-        time.sleep(2)
-        # pyautogui.click(800, 400)
-        PressKey(W)
-        time.sleep(0.2)
-        ReleaseKey(W)
-        time.sleep(1)
+        time.sleep(1.1)
+        PressKey(Q)
+        time.sleep(0.05)
+        ReleaseKey(Q)
         row, col, is_nan = self.process_img(screen)
         state = [row, col, 0, int(self.mouse_up)]
         self.ep_start = time.time()
@@ -152,13 +123,14 @@ class Env:
                 reward = self.get_reward(car_row, car_col, state[2])
                 self.prev_state = [car_row, car_col]
         else:
-            state = [430, 62, 0, 0]
+            state = [265, 97, 0, 0]
             reward = self.get_reward(0, 0, 20, done=True)
         info = dict()
         info['time'] = time.time() - self.ep_start
         if is_nan:
-            time.sleep(0.3)
+            print('car not found')
+            time.sleep(0.1)
             done = True
-            state = [430, 62, 0, 0]
+            state = [265, 97, 0, 0]
             reward = self.get_reward(0, 0, 20, done=True)
         return state, reward, done, info
