@@ -61,11 +61,11 @@ class Env:
     @staticmethod
     def gate(var1, var2, border):
         if var1 < border <= var2:
-            print(f'gate passed {var1} {var2} {border}')
-            return 51
+            print(f'gate passed {border}')
+            return 101
         if var1 > border >= var2:
             print(f'gate passed {border}')
-            return 51
+            return 101
         return 0
 
     @classmethod
@@ -99,17 +99,17 @@ class Env:
     def reset(self):
         print('reset')
         self.turn(-1)
-        time.sleep(1.1)
+        time.sleep(1.3)
         PressKey(Q)
         screen = self.get_screen()
-        time.sleep(0.03)
-        ReleaseKey(Q)
+        time.sleep(0.05)
         row, col, is_nan = self.process_img(screen)
         state = [row, col, 0, int(self.mouse_up)]
         self.ep_start = time.time()
         self.time_checked = self.ep_start
         self.have_turned = False
         self.prev_state = [row, col]
+        ReleaseKey(Q)
         print('exit_reset')
         return state
 
@@ -121,9 +121,7 @@ class Env:
         if not done:
             car_row, car_col, is_nan = self.process_img(screen)
             if is_nan:
-                done = True
-                state = [269, 116, 0, 0]
-                reward = self.get_reward(0, 0, 0, done=True)
+                state, reward, done, info = self.step(action, act)
             else:
                 state = [car_row, car_col, self.get_direction(
                     car_row - self.prev_state[0], car_col - self.prev_state[1]), int(self.mouse_up)]

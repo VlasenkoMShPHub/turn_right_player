@@ -15,7 +15,7 @@ class Agent:
 
 
 class EpsilonGreedyAgent(Agent):
-    def __init__(self, inner_agent, epsilon_max=0.5, epsilon_min=0.1, decay_steps=1000000):
+    def __init__(self, inner_agent, epsilon_max=0.3, epsilon_min=0.1, decay_steps=1000000):
         self._inner_agent = inner_agent
         self._decay_steps = decay_steps
         self._steps = 0
@@ -53,17 +53,19 @@ class QLearning(Agent):
         # print(target_q, self._table[prev_state[0]][prev_state[1]][prev_state[2]][prev_state[3]][action])
 
     def act(self, state):
+        '''
         if np.sum(self._table[state[0]][state[1]][state[2]][state[3]] == 0) == 2:
             print('both zero')
         else:
             print(self._table[state[0]][state[1]][state[2]][state[3]])
+        '''
         return np.argmax(self._table[state[0]][state[1]][state[2]][state[3]])
 
     def save_table(self, reward, step):
         print()
         print('saving')
         non_zero = np.sum(self._table != 0)
-        print('{} non-zero values'.format(non_zero))
+        print('{} non-zero values\n'.format(non_zero))
         np.save('q_l_tables/Q_learning_{}_{}_{}.npy'.format(reward, non_zero, step), self._table)
 
     def load_table(self, name):
@@ -76,7 +78,7 @@ class QLearningUpdater:
         self._backward = True
 
     def update(self, trajectory):
-        print(trajectory)
+        # print(trajectory)
         if self._backward:
             for transition in reversed(trajectory):
                 self._q_learning.update(transition)
@@ -102,7 +104,7 @@ def play_episode(env, agent: Agent, render=False):
                      new_state[2] // discrete_factor, new_state[3]]
         total_reward += reward
         trajectory.append((state, action, new_state, reward, done))
-        print('play ep: {}\t{}\t{}\t{}'.format(action, state, reward, done))
+        # print('play ep: {}\t{}\t{}\t{}'.format(action, state, reward, done))
         state = new_state.copy()
     return trajectory, total_reward
 
@@ -125,8 +127,15 @@ def train_agent(env, exploration_agent: Agent, exploitation_agent: Agent, update
             trajectory, reward = play_episode(env, exploration_agent)
             steps_count += len(trajectory)
             updater.update(trajectory)
+        print(f'total reward: {reward}')
 
     _, reward = play_episode(env, exploitation_agent)
     rewards.append(reward)
     steps.append(steps_count)
     return rewards, steps
+
+
+def play_agent(env, exploitation_agent: Agent):
+    while 1:
+        _, reward = play_episode(env, exploitation_agent)
+        print(reward)
